@@ -1,0 +1,32 @@
+# The stack a delivered agent is evaluated against.
+# Swap the agent image with AGENT_IMAGE, e.g.
+#   AGENT_IMAGE=team7/hyperion:latest docker compose up -d
+
+services:
+  ide-backend:
+    image: donmichael/ide-backend:latest
+    environment:
+      AUTH_ENABLED: "false"
+    ports:
+      - "3001:3001"
+
+  hyperion:
+    image: ${AGENT_IMAGE:-donmichael/hyperion:latest}
+    environment:
+      # Inside this network the backend is a service name, not a host port.
+      IDE_BACKEND_URL: http://ide-backend:3001/api
+      # From .env in this folder, which docker compose reads on its own.
+      # Teams name the key differently, so it goes in under every spelling —
+      # a delivered image carries no key and crashes on its first call without it.
+      API_KEY: ${LITELLM_API_KEY:?set LITELLM_API_KEY in evals/.env}
+      LITELLM_API_KEY: ${LITELLM_API_KEY}
+      OPENAI_API_KEY: ${LITELLM_API_KEY}
+      LLM_API_KEY: ${LITELLM_API_KEY}
+    ports:
+      - "8000:8000"
+    # Safety net for an agent that hardcoded host.docker.internal instead of
+    # reading IDE_BACKEND_URL: it still lands on the published 3001.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - ide-backend
